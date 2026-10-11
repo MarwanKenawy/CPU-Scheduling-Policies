@@ -1,0 +1,14 @@
+
+CC = gcc
+CFLAGS = -std=c11 -Wall -Wextra -pedantic -O2
+
+TARGET = lab6
+SOURCE = main.c
+
+all: $(TARGET)
+
+$(TARGET): $(SOURCE)
+	$(CC) $(CFLAGS) $(SOURCE) -o $(TARGET)
+
+clean:
+	rm -f $(TARGET) $(TARGET).exe
