@@ -126,10 +126,10 @@ int main(void){
     //     fprintf(stderr, "Process %c: arrival=%d, value=%d\n", processes[i].name, processes[i].arrival, processes[i].value);
     // }
 
-    if(strcmp(mode, "trace") != 0){
-        fprintf(stderr, "Statistics mode is not implemented yet.\n");
-        return 1;
-    }
+    // if(strcmp(mode, "trace") != 0){
+    //     fprintf(stderr, "Statistics mode is not implemented yet.\n");
+    //     return 1;
+    // }
 
     for(int p = 0; p < policy_count; p++){
         if(policies[p].id != 1){
@@ -167,6 +167,63 @@ int main(void){
             finish[index] = current_time + processes[index].value;
 
             current_time = finish[index];
+        }
+
+        if(strcmp(mode, "stats") == 0){
+            double total_turnaround = 0.0;
+            double total_norm_turnaround = 0.0;
+
+            printf("FCFS\n");
+
+            printf("Process    |");
+            for(int i = 0; i < process_count; i++){
+                printf("  %c  |", processes[i].name);
+            }
+            printf("\n");
+
+            printf("Arrival    |");
+            for(int i = 0; i < process_count; i++){
+                printf(" %2d  |", processes[i].arrival);
+            }
+            printf("\n");
+
+            printf("Service    |");
+            for(int i = 0; i < process_count; i++){
+                printf(" %2d  |", processes[i].value);
+            }
+            printf(" Mean|\n");
+
+            printf("Finish     |");
+            for(int i = 0; i < process_count; i++){
+                printf(" %2d  |", finish[i]);
+            }
+            printf("-----|\n");
+
+            printf("Turnaround |");
+            for(int i = 0; i < process_count; i++){
+                int turnaround = finish[i] - processes[i].arrival;
+
+                total_turnaround += turnaround;
+
+                printf(" %2d  |", turnaround);
+            }
+
+            printf(" %4.2f|\n", total_turnaround / process_count);
+
+            printf("NormTurn   |");
+
+            for(int i = 0; i < process_count; i++){
+                int turnaround = finish[i] - processes[i].arrival;
+
+                double norm_turnaround = (double)turnaround / processes[i].value;
+
+                total_norm_turnaround += norm_turnaround;
+
+                printf(" %4.2f|", norm_turnaround);
+            }
+            printf(" %4.2f|\n", total_norm_turnaround / process_count);
+            printf("\n");
+            continue;
         }
 
         printf("FCFS  ");
