@@ -105,19 +105,156 @@ int main(void){
             fprintf(stderr, "Error: invalid process data.\n");
             return 1;
         }
+
+        if(processes[i].arrival < 0 || processes[i].value < 0){
+            fprintf(stderr, "Error: negative process value.\n");
+            return 1;
+        }
     }
 
-    fprintf(stderr, "Input parsed successfully.\n");
-    fprintf(stderr, "Mode: %s\n", mode);
-    fprintf(stderr, "Policies: %d\n", policy_count);
-    fprintf(stderr, "Last instant: %d\n", last_instant);
-    fprintf(stderr, "Processes: %d\n", process_count);
+    //test
+    // fprintf(stderr, "Input parsed successfully.\n");
+    // fprintf(stderr, "Mode: %s\n", mode);
+    // fprintf(stderr, "Policies: %d\n", policy_count);
+    // fprintf(stderr, "Last instant: %d\n", last_instant);
+    // fprintf(stderr, "Processes: %d\n", process_count);
 
-    for(int i = 0; i < policy_count; i++){
-        fprintf(stderr, "Policy %d: ID=%d, parameter=%d\n", i + 1, policies[i].id, policies[i].parameter);
-    }
-    for(int i = 0; i < process_count; i++){
-        fprintf(stderr, "Process %c: arrival=%d, value=%d\n", processes[i].name, processes[i].arrival, processes[i].value);
+    // for(int i = 0; i < policy_count; i++){
+    //     fprintf(stderr, "Policy %d: ID=%d, parameter=%d\n", i + 1, policies[i].id, policies[i].parameter);
+    // }
+    // for(int i = 0; i < process_count; i++){
+    //     fprintf(stderr, "Process %c: arrival=%d, value=%d\n", processes[i].name, processes[i].arrival, processes[i].value);
+    // }
+
+    // if(strcmp(mode, "trace") != 0){
+    //     fprintf(stderr, "Statistics mode is not implemented yet.\n");
+    //     return 1;
+    // }
+
+    for(int p = 0; p < policy_count; p++){
+        if(policies[p].id != 1){
+            fprintf(stderr, "Only FCFS is implemeted so far.\n");
+            return 1;
+        }
+
+        int start[MAX_PROCESSES];
+        int finish[MAX_PROCESSES];
+        int order[MAX_PROCESSES];
+        int current_time = 0;
+
+        for(int i = 0; i < process_count; i++){
+            order[i] = i;
+        }
+
+        for(int i = 0; i < process_count; i++){
+            for(int j = i + 1; j < process_count; j++){
+                if(processes[order[j]].arrival < processes[order[i]].arrival){
+                    int temp = order[i];
+                    order[i] = order[j];
+                    order[j] = temp;
+                }
+            }
+        }
+
+        for(int i = 0; i < process_count; i++){
+            int index = order[i];
+
+            if(current_time < processes[index].arrival){
+                current_time = processes[index].arrival;
+            }
+
+            start[index] = current_time;
+            finish[index] = current_time + processes[index].value;
+
+            current_time = finish[index];
+        }
+
+        if(strcmp(mode, "stats") == 0){
+            double total_turnaround = 0.0;
+            double total_norm_turnaround = 0.0;
+
+            printf("FCFS\n");
+
+            printf("Process    |");
+            for(int i = 0; i < process_count; i++){
+                printf("  %c  |", processes[i].name);
+            }
+            printf("\n");
+
+            printf("Arrival    |");
+            for(int i = 0; i < process_count; i++){
+                printf(" %2d  |", processes[i].arrival);
+            }
+            printf("\n");
+
+            printf("Service    |");
+            for(int i = 0; i < process_count; i++){
+                printf(" %2d  |", processes[i].value);
+            }
+            printf(" Mean|\n");
+
+            printf("Finish     |");
+            for(int i = 0; i < process_count; i++){
+                printf(" %2d  |", finish[i]);
+            }
+            printf("-----|\n");
+
+            printf("Turnaround |");
+            for(int i = 0; i < process_count; i++){
+                int turnaround = finish[i] - processes[i].arrival;
+
+                total_turnaround += turnaround;
+
+                printf(" %2d  |", turnaround);
+            }
+
+            printf(" %4.2f|\n", total_turnaround / process_count);
+
+            printf("NormTurn   |");
+
+            for(int i = 0; i < process_count; i++){
+                int turnaround = finish[i] - processes[i].arrival;
+
+                double norm_turnaround = (double)turnaround / processes[i].value;
+
+                total_norm_turnaround += norm_turnaround;
+
+                printf(" %4.2f|", norm_turnaround);
+            }
+            printf(" %4.2f|\n", total_norm_turnaround / process_count);
+            printf("\n");
+            continue;
+        }
+
+        printf("FCFS  ");
+
+        for (int t = 0; t <= last_instant; t++) {
+            printf("%d ", t % 10);
+        }
+
+        printf("\n");
+        printf("------------------------------------------------\n");
+
+        for(int i = 0; i < process_count; i++){
+            printf("%-6c", processes[i].name);
+            for(int t = 0; t < last_instant; t++){
+                char cell = ' ';
+
+                if(t >= processes[i].arrival && t < finish[i]){
+                    if(t >= start[i]){
+                        cell = '*';
+                    }else{
+                        cell = '.';
+                    }
+                }
+
+                printf("|%c", cell);
+            }
+            printf("| \n");
+        }
+
+        printf("------------------------------------------------\n");
+        printf("\n");
     }
     return 0;
 }
