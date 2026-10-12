@@ -133,8 +133,8 @@ int main(void){
     // }
 
     for(int p = 0; p < policy_count; p++){
-        if(policies[p].id != 1 && policies[p].id != 2){
-            fprintf(stderr, "Only FCFS and Round Robin are implemented so far.\n");
+        if(policies[p].id != 1 && policies[p].id != 2 && policies[p].id != 3){
+            fprintf(stderr, "Only FCFS, Round Robin, SPN are implemented so far.\n");
             return 1;
         }
 
@@ -192,7 +192,7 @@ int main(void){
     
                 current_time = finish[index];
             }
-        }else{
+        }else if(policies[p].id == 2){
             int queue[MAX_PROCESSES];
             int front = 0;
             int rear = 0;
@@ -253,6 +253,39 @@ int main(void){
                     }
                 }
             }
+        }else if(policies[p].id == 3){
+            int current = -1;
+            for(int t = 0; t < last_instant; t++){
+                if(current == -1){
+                    int shortest = -1;
+
+                    for(int i = 0; i < process_count; i++){
+                        if(processes[i].arrival <= t && remaining[i] > 0){
+                            if(shortest == -1 || processes[i].value < processes[shortest]. value){
+                                shortest = i;
+                            }
+                        }
+                    }
+
+                    current = shortest;
+
+                    if(current != -1 && start[current] == -1){
+                        start[current] = t;
+                    }
+                }
+
+                if(current != -1){
+                    running_at[t] = current;
+
+                    remaining[current]--;
+
+                    if(remaining[current] == 0){
+                        finish[current] = t + 1;
+                        current = -1;
+                    }
+                }
+
+            }
         }
 
         if(strcmp(mode, "stats") == 0){
@@ -261,8 +294,10 @@ int main(void){
 
             if(policies[p].id == 1){
                 printf("FCFS\n");
-            }else{
+            }else if(policies[p].id == 2){
                 printf("RR-%d\n", policies[p].parameter);
+            }else if(policies[p].id == 3){
+                printf("SPN\n");
             }
 
             printf("Process    |");
@@ -318,8 +353,10 @@ int main(void){
 
         if(policies[p].id == 1){
             printf("FCFS  ");
-        }else{
+        }else if(policies[p].id == 2){
             printf("RR-%d  ", policies[p].parameter);
+        }else if(policies[p].id == 3){
+            printf("SPN   ");
         }
 
         for (int t = 0; t <= last_instant; t++) {
