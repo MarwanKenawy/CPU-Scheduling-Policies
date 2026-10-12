@@ -6,6 +6,7 @@
 #define MAX_LINE 256
 #define MAX_PROCESSES 100
 #define MAX_POLICIES 20
+#define MAX_TIME 10000
 
 typedef struct
 {
@@ -132,20 +133,22 @@ int main(void){
     // }
 
     for(int p = 0; p < policy_count; p++){
-        if(policies[p].id != 1){
-            fprintf(stderr, "Only FCFS is implemeted so far.\n");
+        if(policies[p].id != 1 && policies[p].id != 2){
+            fprintf(stderr, "Only FCFS and Round Robin are implemented so far.\n");
             return 1;
         }
 
         int start[MAX_PROCESSES];
         int finish[MAX_PROCESSES];
         int order[MAX_PROCESSES];
-        int current_time = 0;
 
+        int running_at[MAX_TIME];
+        int remaining[MAX_PROCESSES];
+        
         for(int i = 0; i < process_count; i++){
             order[i] = i;
         }
-
+        
         for(int i = 0; i < process_count; i++){
             for(int j = i + 1; j < process_count; j++){
                 if(processes[order[j]].arrival < processes[order[i]].arrival){
@@ -155,25 +158,112 @@ int main(void){
                 }
             }
         }
-
+        
+        if(last_instant > MAX_TIME){
+            fprintf(stderr, "Simulation limit is too large.\n");
+            return 1;
+        }
+        
+        for(int t = 0; t < last_instant; t++){
+            running_at[t] = -1;
+        }
+        
         for(int i = 0; i < process_count; i++){
-            int index = order[i];
+            start[i] = -1;
+            finish[i] = -1;
+            remaining[i] = processes[i].value;
+        }
+        
+        if(policies[p].id == 1){
+            int current_time = 0;
+            for(int i = 0; i < process_count; i++){
+                int index = order[i];
+                
+                if(current_time < processes[index].arrival){
+                    current_time = processes[index].arrival;
+                }
+    
+                start[index] = current_time;
+                finish[index] = current_time + processes[index].value;
 
-            if(current_time < processes[index].arrival){
-                current_time = processes[index].arrival;
+                for(int t = start[index]; t < finish[index] && t < last_instant; t++){
+                    running_at[t] = index;
+                }
+    
+                current_time = finish[index];
+            }
+        }else{
+            int queue[MAX_PROCESSES];
+            int front = 0;
+            int rear = 0;
+            int count = 0;
+
+            int quantum = policies[p].parameter;
+            int current = -1;
+            int quantum_left = 0;
+            int requeue = 0;
+
+            if(quantum <= 0){
+                fprintf(stderr, "Round Robin quantum must be positive.\n");
+                return 1;
             }
 
-            start[index] = current_time;
-            finish[index] = current_time + processes[index].value;
+            for(int t = 0; t < last_instant; t++){
+                for(int i = 0; i < process_count; i++){
+                    if(processes[i].arrival == t){
+                        queue[rear] = i;
+                        rear = (rear + 1) % MAX_PROCESSES;
+                        count++;
+                    }
+                }
 
-            current_time = finish[index];
+                if(requeue){
+                    queue[rear] = current;
+                    rear = (rear + 1) % MAX_PROCESSES;
+                    count++;
+
+                    current = -1;
+                    requeue = 0;
+                }
+
+                if(current == -1 && count > 0){
+                    current = queue[front];
+                    front = (front + 1) % MAX_PROCESSES;
+                    count--;
+
+                    quantum_left = quantum;
+                }
+
+                if(current != -1){
+                    int i = current;
+
+                    if(start[i] == -1){
+                        start[i] = t;
+                    }
+
+                    running_at[t] = i;
+                    remaining[i]--;
+                    quantum_left--;
+
+                    if(remaining[i] == 0){
+                        finish[i] = t + 1;
+                        current = -1;
+                    }else if(quantum_left == 0){
+                        requeue = 1;
+                    }
+                }
+            }
         }
 
         if(strcmp(mode, "stats") == 0){
             double total_turnaround = 0.0;
             double total_norm_turnaround = 0.0;
 
-            printf("FCFS\n");
+            if(policies[p].id == 1){
+                printf("FCFS\n");
+            }else{
+                printf("RR-%d\n", policies[p].parameter);
+            }
 
             printf("Process    |");
             for(int i = 0; i < process_count; i++){
@@ -208,7 +298,7 @@ int main(void){
                 printf(" %2d  |", turnaround);
             }
 
-            printf(" %4.2f|\n", total_turnaround / process_count);
+            printf("%5.2f|\n", total_turnaround / process_count);
 
             printf("NormTurn   |");
 
@@ -226,7 +316,11 @@ int main(void){
             continue;
         }
 
-        printf("FCFS  ");
+        if(policies[p].id == 1){
+            printf("FCFS  ");
+        }else{
+            printf("RR-%d  ", policies[p].parameter);
+        }
 
         for (int t = 0; t <= last_instant; t++) {
             printf("%d ", t % 10);
@@ -240,8 +334,8 @@ int main(void){
             for(int t = 0; t < last_instant; t++){
                 char cell = ' ';
 
-                if(t >= processes[i].arrival && t < finish[i]){
-                    if(t >= start[i]){
+                if(t >= processes[i].arrival && (finish[i] == -1 || t < finish[i])){
+                    if(running_at[t] == i){
                         cell = '*';
                     }else{
                         cell = '.';
