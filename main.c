@@ -33,6 +33,8 @@ void print_stats(Policy policy, const Process processes[], int process_count, co
         printf("SPN\n");
     }else if(policy.id == 4){
         printf("SRT\n");
+    }else if(policy.id == 5){
+        printf("HRRN\n");
     }
 
     printf("Process    |");
@@ -94,6 +96,8 @@ void print_trace(Policy policy, const Process processes[], int process_count, in
         printf("SPN   ");
     }else if(policy.id == 4){
         printf("SRT   ");
+    }else if(policy.id == 5){
+        printf("HRRN  ");
     }
 
     for (int t = 0; t <= last_instant; t++) {
@@ -306,6 +310,44 @@ void srt(const Process processes[], int process_count, int last_instant, int sta
     }
 }
 
+void hrrn(const Process processes[], int process_count, int last_instant, int start[], int finish[], int running_at[], int remaining[]){
+    int current = -1;
+
+    for(int t = 0; t < last_instant; t++){
+        if(current == -1){
+            int highest = -1;
+            double highest_ratio = -1.0;
+            for(int i = 0; i < process_count; i++){
+                if(processes[i].arrival <= t && remaining[i] > 0 && processes[i].value > 0){
+                    double ratio = (double)(t - processes[i].arrival + processes[i].value) / processes[i].value;
+    
+                    if(highest == -1 || ratio > highest_ratio){
+                        highest = i;
+                        highest_ratio = ratio;
+                    }
+                }
+            }
+
+            current = highest;
+
+            if(current != -1 && start[current] == -1){
+                start[current] = t;
+            }
+        }
+
+        if(current != -1){
+            running_at[t] = current;
+            remaining[current]--;
+
+            if(remaining[current] == 0){
+                finish[current] = t + 1;
+                current = -1;
+            }
+        }
+
+    }
+}
+
 int main(void){
     char line[MAX_LINE];
     char mode[20];
@@ -420,8 +462,8 @@ int main(void){
     // }
 
     for(int p = 0; p < policy_count; p++){
-        if(policies[p].id < 1 || policies[p].id > 4){
-            fprintf(stderr, "Only FCFS, Round Robin, SPN, and SRT are implemented so far.\n");
+        if(policies[p].id < 1 || policies[p].id > 5){
+            fprintf(stderr, "Only FCFS, Round Robin, SPN, SRT, and HRRN are implemented so far.\n");
             return 1;
         }
 
@@ -443,6 +485,8 @@ int main(void){
             spn(processes, process_count, last_instant, start, finish, running_at, remaining);
         }else if(policies[p].id == 4){
             srt(processes, process_count, last_instant, start, finish, running_at, remaining);
+        }else if(policies[p].id == 5){
+            hrrn(processes, process_count, last_instant, start, finish, running_at, remaining);
         }
 
         if(strcmp(mode, "stats") == 0){
