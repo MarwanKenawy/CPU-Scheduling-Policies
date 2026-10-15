@@ -31,6 +31,8 @@ void print_stats(Policy policy, const Process processes[], int process_count, co
         printf("RR-%d\n", policy.parameter);
     }else if(policy.id == 3){
         printf("SPN\n");
+    }else if(policy.id == 4){
+        printf("SRT\n");
     }
 
     printf("Process    |");
@@ -90,6 +92,8 @@ void print_trace(Policy policy, const Process processes[], int process_count, in
         printf("RR-%d  ", policy.parameter);
     }else if(policy.id == 3){
         printf("SPN   ");
+    }else if(policy.id == 4){
+        printf("SRT   ");
     }
 
     for (int t = 0; t <= last_instant; t++) {
@@ -265,6 +269,43 @@ void spn(const Process processes[], int process_count, int last_instant, int sta
     }
 }
 
+void srt(const Process processes[], int process_count, int last_instant, int start[], int finish[], int running_at[], int remaining[]){
+    int current = -1;
+
+    for(int t = 0; t < last_instant; t++){
+        int shortest = -1;
+
+        for(int i = 0; i < process_count; i++){
+            if(processes[i].arrival <= t && remaining[i] > 0){
+                if(shortest == -1 || remaining[i] < remaining[shortest]){
+                    shortest = i;
+                }
+            }
+        }
+
+        if(shortest == -1){
+            current = -1;
+            continue;
+        }
+
+        if(current == -1 || remaining[current] <= 0 || remaining[shortest] < remaining[current]){
+            current = shortest;
+        }
+
+        if(start[current] == -1){
+            start[current] = t;
+        }
+
+        running_at[t] = current;
+        remaining[current]--;
+
+        if(remaining[current] == 0){
+            finish[current] = t + 1;
+            current = -1;
+        }
+    }
+}
+
 int main(void){
     char line[MAX_LINE];
     char mode[20];
@@ -379,8 +420,8 @@ int main(void){
     // }
 
     for(int p = 0; p < policy_count; p++){
-        if(policies[p].id != 1 && policies[p].id != 2 && policies[p].id != 3){
-            fprintf(stderr, "Only FCFS, Round Robin, SPN are implemented so far.\n");
+        if(policies[p].id < 1 || policies[p].id > 4){
+            fprintf(stderr, "Only FCFS, Round Robin, SPN, and SRT are implemented so far.\n");
             return 1;
         }
 
@@ -400,6 +441,8 @@ int main(void){
             rr(processes, process_count, last_instant, policies[p].parameter, start, finish, running_at, remaining);
         }else if(policies[p].id == 3){
             spn(processes, process_count, last_instant, start, finish, running_at, remaining);
+        }else if(policies[p].id == 4){
+            srt(processes, process_count, last_instant, start, finish, running_at, remaining);
         }
 
         if(strcmp(mode, "stats") == 0){
