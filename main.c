@@ -37,6 +37,8 @@ void print_stats(Policy policy, const Process processes[], int process_count, co
         printf("HRRN\n");
     }else if(policy.id == 6){
         printf("FB-1\n");
+    }else if(policy.id == 7){
+        printf("FB-2i\n");
     }
 
     printf("Process    |");
@@ -102,6 +104,8 @@ void print_trace(Policy policy, const Process processes[], int process_count, in
         printf("HRRN  ");
     }else if(policy.id == 6){
         printf("FB-1  ");
+    }else if(policy.id == 7){
+        printf("FB-2i ");
     }
 
     for (int t = 0; t <= last_instant; t++) {
@@ -430,6 +434,102 @@ void fb1(const Process processes[], int process_count, int last_instant, int sta
     }
 }
 
+void fb2i(const Process processes[], int process_count, int last_instant, int start[], int finish[], int running_at[], int remaining[]){
+    int queue_level[MAX_PROCESSES];
+    int ready_order[MAX_PROCESSES];
+    int quantum_used[MAX_PROCESSES];
+
+    int next_ready_order = 0;
+
+    int current = -1;
+
+    for(int i = 0; i < process_count; i++){
+        queue_level[i] = 0;
+        ready_order[i] = -1;
+        quantum_used[i] = 0;
+    }
+
+    for(int t = 0; t < last_instant; t++){
+        int new_arrival = 0;
+
+        for(int i = 0; i < process_count; i++){
+            if(processes[i].arrival == t && remaining[i] > 0){
+                queue_level[i] = 0;
+                ready_order[i] = next_ready_order++;
+                quantum_used[i] = 0;
+                new_arrival = 1;
+            }
+        }
+
+        if(current != -1 && new_arrival && quantum_used[current] == 0){
+            queue_level[current]++;
+            quantum_used[current] = 0;
+            ready_order[current] = next_ready_order++;
+            current = -1;
+        }
+
+        if(current == -1){
+            int selected = -1;
+
+            for(int i = 0; i < process_count; i++){
+                if(processes[i].arrival <= t && remaining[i] > 0 && ready_order[i] >= 0){
+                    if(selected == -1 || queue_level[i] < queue_level[selected]  || (queue_level[i] == queue_level[selected] && ready_order[i] < ready_order[selected])){
+                        selected = i;
+                    }
+                }
+            }
+
+            if(selected != -1){
+                current = selected;
+                ready_order[current] = -1;
+            }
+        }
+
+        if(current != -1){
+            running_at[t] = current;
+
+            if(start[current] == -1){
+                start[current] = t;
+            }
+
+            remaining[current]--;
+            quantum_used[current]++;
+
+            if(remaining[current] == 0){
+                finish[current] = t + 1;
+                current = -1;
+                continue;
+            }
+
+            int quantum = 1;
+
+            for(int level = 0; level < queue_level[current] && quantum <= MAX_TIME; level++){
+                quantum *= 2;
+            }
+
+            int has_waiting = 0;
+
+            for(int i = 0; i < process_count; i++){
+                if(i != current && processes[i].arrival <= t && remaining[i] > 0 && ready_order[i] >= 0){
+                    has_waiting = 1;
+                    break;
+                }
+            }
+
+            if(quantum_used[current] >= quantum){
+                if(has_waiting){
+                    queue_level[current]++;
+                    quantum_used[current] = 0;
+                    ready_order[current] = next_ready_order++;
+                    current = -1;
+                }else{
+                    quantum_used[current] = 0;
+                }
+            }
+        }
+    }
+}
+
 int main(void){
     char line[MAX_LINE];
     char mode[20];
@@ -544,8 +644,8 @@ int main(void){
     // }
 
     for(int p = 0; p < policy_count; p++){
-        if(policies[p].id < 1 || policies[p].id > 6){
-            fprintf(stderr, "Only FCFS, Round Robin, SPN, SRT, HRRN, and FB-1 are implemented so far.\n");
+        if(policies[p].id < 1 || policies[p].id > 7){
+            fprintf(stderr, "Only FCFS, Round Robin, SPN, SRT, HRRN, FB-1, and FB-2i are implemented so far.\n");
             return 1;
         }
 
@@ -571,6 +671,8 @@ int main(void){
             hrrn(processes, process_count, last_instant, start, finish, running_at, remaining);
         }else if(policies[p].id == 6){
             fb1(processes, process_count, last_instant, start, finish, running_at, remaining);
+        }else if(policies[p].id == 7){
+            fb2i(processes, process_count, last_instant, start, finish, running_at, remaining);
         }
 
         if(strcmp(mode, "stats") == 0){
