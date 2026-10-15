@@ -35,6 +35,8 @@ void print_stats(Policy policy, const Process processes[], int process_count, co
         printf("SRT\n");
     }else if(policy.id == 5){
         printf("HRRN\n");
+    }else if(policy.id == 6){
+        printf("FB-1\n");
     }
 
     printf("Process    |");
@@ -98,6 +100,8 @@ void print_trace(Policy policy, const Process processes[], int process_count, in
         printf("SRT   ");
     }else if(policy.id == 5){
         printf("HRRN  ");
+    }else if(policy.id == 6){
+        printf("FB-1  ");
     }
 
     for (int t = 0; t <= last_instant; t++) {
@@ -348,6 +352,84 @@ void hrrn(const Process processes[], int process_count, int last_instant, int st
     }
 }
 
+void fb1(const Process processes[], int process_count, int last_instant, int start[], int finish[], int running_at[], int remaining[]){
+    int queue_level[MAX_PROCESSES];
+    int ready_order[MAX_PROCESSES];
+    
+    int next_ready_order = 0;
+    int current = -1;
+
+    for(int i = 0; i < process_count; i++){
+        queue_level[i] = 0;
+        ready_order[i] = -1;
+    }
+
+    for(int t = 0; t < last_instant; t++){
+        int new_arrival = 0;
+
+        for(int i = 0; i < process_count; i++){
+            if(processes[i].arrival == t && remaining[i] > 0){
+                queue_level[i] = 0;
+                ready_order[i] = next_ready_order++;
+                new_arrival = 1;
+            }
+        }
+
+        if(current != -1 && new_arrival){
+            queue_level[current]++;
+            ready_order[current] = next_ready_order++;
+            current = -1;
+        }
+
+        if(current == -1){
+            int selected = -1;
+
+            for(int i = 0; i < process_count; i++){
+                if(processes[i].arrival <= t && remaining[i] > 0 && ready_order[i] >= 0){
+                    if(selected == -1 || queue_level[i] < queue_level[selected] || (queue_level[i] == queue_level[selected] && ready_order[i] < ready_order[selected])){
+                        selected = i;
+                    }
+                }
+            }
+
+            if(selected != -1){
+                current = selected;
+                ready_order[current] = -1;
+            }
+        }
+
+        if(current != -1){
+            running_at[t] = current;
+
+            if(start[current] == -1){
+                start[current] = t;
+            }
+
+            remaining[current]--;
+
+            if(remaining[current] == 0){
+                finish[current] = t + 1;
+                current = -1;
+            }else{
+                int has_waiting = 0;
+
+                for(int i = 0; i < process_count; i++){
+                    if(i != current && processes[i].arrival <= t && remaining[i] > 0 && ready_order[i] >= 0){
+                        has_waiting = 1;
+                        break;
+                    }
+                }
+
+                if(has_waiting){
+                    queue_level[current]++;
+                    ready_order[current] = next_ready_order++;
+                    current = -1;
+                }
+            }
+        }
+    }
+}
+
 int main(void){
     char line[MAX_LINE];
     char mode[20];
@@ -462,8 +544,8 @@ int main(void){
     // }
 
     for(int p = 0; p < policy_count; p++){
-        if(policies[p].id < 1 || policies[p].id > 5){
-            fprintf(stderr, "Only FCFS, Round Robin, SPN, SRT, and HRRN are implemented so far.\n");
+        if(policies[p].id < 1 || policies[p].id > 6){
+            fprintf(stderr, "Only FCFS, Round Robin, SPN, SRT, HRRN, and FB-1 are implemented so far.\n");
             return 1;
         }
 
@@ -487,6 +569,8 @@ int main(void){
             srt(processes, process_count, last_instant, start, finish, running_at, remaining);
         }else if(policies[p].id == 5){
             hrrn(processes, process_count, last_instant, start, finish, running_at, remaining);
+        }else if(policies[p].id == 6){
+            fb1(processes, process_count, last_instant, start, finish, running_at, remaining);
         }
 
         if(strcmp(mode, "stats") == 0){
