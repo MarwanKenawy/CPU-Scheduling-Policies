@@ -39,6 +39,8 @@ void print_stats(Policy policy, const Process processes[], int process_count, co
         printf("FB-1\n");
     }else if(policy.id == 7){
         printf("FB-2i\n");
+    }else if(policy.id == 8){
+        printf("Aging\n");
     }
 
     printf("Process    |");
@@ -106,6 +108,8 @@ void print_trace(Policy policy, const Process processes[], int process_count, in
         printf("FB-1  ");
     }else if(policy.id == 7){
         printf("FB-2i ");
+    }else if(policy.id == 8){
+        printf("Aging ");
     }
 
     for (int t = 0; t <= last_instant; t++) {
@@ -530,6 +534,74 @@ void fb2i(const Process processes[], int process_count, int last_instant, int st
     }
 }
 
+void aging(const Process processes[], int process_count, int last_instant, int quantum, int running_at[]){
+    long long priority[MAX_PROCESSES];
+
+    int current = -1;
+
+    int ready_order[MAX_PROCESSES];
+    int next_ready_order = 0;
+
+    for(int i = 0; i < process_count; i++){
+        priority[i] = processes[i].value;
+        ready_order[i] = -1;
+    }
+
+    for(int t = 0; t < last_instant; t += quantum){
+        int previous_current = current;
+        
+        if(previous_current != -1){
+            priority[previous_current] = processes[previous_current].value;
+        }
+
+        for(int i = 0; i < process_count; i++){
+            if(processes[i].arrival <= t && i != previous_current && ready_order[i] == -1){
+                ready_order[i] = next_ready_order++;
+            }
+        }
+
+        for(int i = 0; i < process_count; i++){
+            if(processes[i].arrival <= t && i != previous_current){
+                priority[i]++;
+            }
+        }
+
+        if(previous_current != -1){
+            ready_order[previous_current] = next_ready_order++;
+        }
+
+        int selected = -1;
+
+        for(int i = 0; i < process_count; i++){
+            if(processes[i].arrival <= t && ready_order[i] >= 0){
+                if(selected == -1 || priority[i] > priority[selected] || (priority[i] == priority[selected] && ready_order[i] < ready_order[selected])){
+                    selected = i;
+                }
+            }
+        }
+
+        current = selected;
+
+        if(current == -1){
+            continue;
+        }
+
+        ready_order[current] = -1;
+
+        int end = t + quantum;
+
+        if(end > last_instant){
+            end = last_instant;
+        }
+        
+        for(int time = t; time < end; time++){
+            running_at[time] = current;
+        }
+    }
+
+
+}
+
 int main(void){
     char line[MAX_LINE];
     char mode[20];
@@ -644,8 +716,8 @@ int main(void){
     // }
 
     for(int p = 0; p < policy_count; p++){
-        if(policies[p].id < 1 || policies[p].id > 7){
-            fprintf(stderr, "Only FCFS, Round Robin, SPN, SRT, HRRN, FB-1, and FB-2i are implemented so far.\n");
+        if(policies[p].id < 1 || policies[p].id > 8){
+            fprintf(stderr, "Only FCFS, Round Robin, SPN, SRT, HRRN, FB-1, FB-2i, and Aging are implemented so far.\n");
             return 1;
         }
 
@@ -673,6 +745,12 @@ int main(void){
             fb1(processes, process_count, last_instant, start, finish, running_at, remaining);
         }else if(policies[p].id == 7){
             fb2i(processes, process_count, last_instant, start, finish, running_at, remaining);
+        }else if(policies[p].id == 8){
+            if(policies[p].parameter <= 0){
+                fprintf(stderr, "Aging quantum must be positive.\n");
+                return 1;
+            }
+            aging(processes, process_count, last_instant, policies[p].parameter, running_at);
         }
 
         if(strcmp(mode, "stats") == 0){
